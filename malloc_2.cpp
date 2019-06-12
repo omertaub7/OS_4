@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <cstring>
 #include "list.h"
 
@@ -17,19 +18,19 @@ size_t _num_free_blocks() {
     return num_free_blocks;
 }
 
-size_t _num_free_bytes () {
+size_t _num_free_bytes () { //number of free bytes in the system excluding meta-data
     return num_free_bytes;
 }
 
-size_t _num_allocated_blocks() {
+size_t _num_allocated_blocks() { //all alocated blocks (free or not)
     return num_allocated_blocks;
 }
 
-size_t _num_allocated_bytes() {
+size_t _num_allocated_bytes() {//free and used excluding meta da
     return num_allocated_bytes;
 }
 
-size_t _num_meta_data_bytes() {
+size_t _num_meta_data_bytes() { //all meta data bytes in heap
     return num_meta_data_bytes;
 }
 
@@ -38,80 +39,85 @@ size_t _size_meta_data() {
 }
 
 
+void print_node(list_node* node){
+
+if(node==NULL)return;
+printf(".......................................................\n.........................node addr : %p   \n node->is_free= %d  .......... addr : %p   \n node->allocated size= %d .... addr : %p   \n node->used size= %d  ........ addr : %p   \n node->memory pointer= %p .... addr : %p   \n ---total node size : %d \n .........................................................\n " , node  ,(int)(node->is_free),&(node->is_free),  (int)(node->allocated_size),&(node->allocated_size), (int)(node->used_size),&(node->used_size),   node->memory_pointer,&(node->memory_pointer),  (int)sizeof(list_node) );
+
+}
+
+
+
 void* do_alloc (size_t size) {
     if (size == 0 || size >= 100000000) return NULL;
   
    void* ptr=sbrk(0);
    if(ptr==NULL||ptr == (void*)-1) return NULL;
  
-   if(brk(ptr+size)== -1) return NULL;
+   if(brk(ptr+size)== -1) {
+   
+   return NULL;
+   }
    
    return ptr;
 }
 
 void* malloc(size_t size) {
   
- if (size <= 0 || size >= 100000000) return NULL;
-    if (!list_head|| _num_free_blocks()==0 ) {
-        
-        size_t to_alloc = sizeof(list_node);
-        list_head = (list_node*)do_alloc(to_alloc);
-        if (!list_head) return NULL;
-        
-        void* ret = do_alloc(size);
-        if (!ret){
-          list_head=NULL;
-          do_alloc(-to_alloc);
-          return NULL;
-         }
-        list_head->is_free = false;
-      //  list_head->meta_size = sizeof(list_node);
-        list_head->used_size = size;
-        list_head->allocated_size = size;
-        list_head->next = NULL;
-        list_head->prev = NULL;
-        list_tail = list_head;
-        num_allocated_blocks++;
-        num_allocated_bytes+=size;
-        num_meta_data_bytes+=sizeof(list_node);
-
-        return ret;
-    }
-    
-    list_node* place_to_alloc = find_next_place (list_head, size);
-    if (place_to_alloc) {
-        num_free_blocks--;
-        num_free_bytes -= size; // Check this case if we dont reuse full block
-        place_to_alloc->is_free = false;
-        place_to_alloc->used_size = size;
-        return place_to_alloc+sizeof(list_node);
-    }
-    
-    size_t to_alloc = sizeof(list_node);
-    list_tail->next = (list_node*)do_alloc(to_alloc);
-    if (!(list_tail->next )){
-      do_alloc(-to_alloc);
-     return NULL;
+   if (size <= 0 || size >= 100000000) return NULL;
+   list_node* new_node;
+   if(!list_head){
+     new_node=(list_node*)do_alloc(sizeof(list_node));
+     init_node(new_node,false,size,size,NULL,NULL,NULL);
+     new_node->memory_pointer=do_alloc(size);
+     if(!(new_node->memory_pointer)){  //if alloc falils 
+       do_alloc(-sizeof(list_node));   // free last meta alloc
+       return NULL;
+      }
+      list_head=new_node;
+      list_tail=list_head;
+      
+      num_allocated_blocks++;
+      num_allocated_bytes+=(int)size;
+      num_meta_data_bytes+=sizeof(list_node);
+      
+      return new_node->memory_pointer;
+      
+   }
+   else{
+     new_node=find_next_place(list_head,size);
+     if (!new_node){      //there is no already existing place for alloc. must allocate a new block
+         new_node=(list_node*)do_alloc(sizeof(list_node));
+         init_node(new_node,false,size,size,NULL,list_tail,NULL);
+         new_node->memory_pointer=do_alloc(size);
+         if(!(new_node->memory_pointer)){    //if alloc falils 
+             do_alloc(-sizeof(list_node));   // free last meta alloc
+             return NULL;
+           }
+           list_tail->next=new_node;
+           list_tail=new_node;
+            num_allocated_blocks++;
+            num_allocated_bytes+=(int)size;
+            num_meta_data_bytes+=sizeof(list_node);
+      
+          return new_node->memory_pointer;
+           
+     
      }
-    (list_tail->next)->prev=list_tail;
-    list_tail = list_tail->next;
-    list_tail->is_free = false;
-   // list_head->meta_size = sizeof(list_node);
-     void* ret =do_alloc(size);
-     if (!ret){
+     else{         //there is an already existing place for alloc block.
+         new_node->is_free=false;
+         new_node->used_size=size;
+         num_free_blocks--;
+         num_free_bytes-=(new_node->allocated_size);
+         return new_node->memory_pointer;
+            
+     }
+         // should not get here:
+       
+         return NULL;
+   
+      }
          
-          do_alloc(-to_alloc);
-          return NULL;
-         }
-    list_tail->used_size = size;
-    list_tail->allocated_size = size;
-    list_tail->next = NULL;
-    
-    
-    num_allocated_blocks++;
-    num_allocated_bytes+=size;
-    num_meta_data_bytes+=sizeof(list_node);
-    return ret;
 }
 
 void* calloc (size_t num, size_t size) {
@@ -123,12 +129,19 @@ void* calloc (size_t num, size_t size) {
 
 
 void* realloc (void* oldp, size_t size) {
-    if (!oldp || size <=0 || size >= 100000000) return NULL;
-    list_node* node =(list_node*) oldp-sizeof(list_node);
+    if ( size <=0 || size >= 100000000) return NULL;
+    if(oldp == NULL){
+      return malloc(size);
+    }
+    list_node* node=(list_node*)(oldp-sizeof(list_node));
+  //  printf("\n \n  ------------------starting to realloc mem from %p \n", oldp);
+  //  print_node(node);
     if (node->allocated_size >= size) {
+   //   printf("current size fits\n");
         node->used_size = size;
         return oldp;
     } else {
+  //  printf("current size didn't fit\n");
         void* new_block = malloc(size);
         if (!new_block) return NULL;
         std::memcpy(new_block, oldp , node->used_size);
@@ -136,19 +149,39 @@ void* realloc (void* oldp, size_t size) {
         return new_block;
     }
 }
+
+
+
+
+
+
+
 void free (void* p) {
+if(p == NULL || p<=(void*)0 ) return ;
+   /*
     list_node* node=list_head;
     while(node!=NULL && ((void*)(node+1))!=p){
     
-    node=node->next;
+      node=node->next;
+    
     }
-    if(!node)return;
+    */
+ //   printf("addr to free: %p\n",p);
+    
+    list_node* node=(list_node*)(p-sizeof(list_node));
+    
+        
+    if(!node){
+  //  printf("what?! didnt find block to free?!?!?\n");
+    return;
+    }
     
    // list_node* node =(list_node*) (p-sizeof(list_node));
     node->is_free = true;
     node->used_size = 0;
     num_free_blocks ++;
     num_free_bytes += node->allocated_size;
+  //  print_node(node);
 }
 
 
