@@ -1,3 +1,7 @@
+//
+// Created by shahar on 17-Jun-19.
+//
+
 #include <unistd.h>
 //#include <stdlib.h>
 #include <stdio.h>
@@ -51,7 +55,17 @@ list_node* find_next_place (list_node* head, size_t to_alloc) {
 void print_node(list_node* node){
 
     if(node==NULL)return;
-    printf(".......................................................\n.........................node addr : %p   \n node->is_free= %d  .......... addr : %p   \n node->allocated size= %d .... addr : %p   \n node->used size= %d  ........ addr : %p   \n node->memory pointer= %p .... addr : %p   \n ---total node size : %d \n .........................................................\n " , node  ,(int)(node->is_free),&(node->is_free),  (int)(node->allocated_size),&(node->allocated_size), (int)(node->used_size),&(node->used_size),   node->memory_pointer,&(node->memory_pointer),  (int)sizeof(list_node) );
+    printf(".......................................................\n"
+           ".........................node addr : %p   \n "
+           "node->is_free= %d  .......... addr : %p   \n "
+           "node->allocated size= %d .... addr : %p   \n "
+           "node->used size= %d  ........ addr : %p   \n "
+           "node->memory pointer= %p .... addr : %p   \n "
+           "-------------------total node size : %d \n "
+           ".........................................................\n "
+           , node  ,(int)(node->is_free),&(node->is_free),  (int)(node->allocated_size),&(node->allocated_size),
+           (int)(node->used_size),&(node->used_size),   node->memory_pointer,&(node->memory_pointer),
+           (int)sizeof(list_node) );
 
 }
 
@@ -204,7 +218,7 @@ void* malloc(size_t size) {
         num_allocated_blocks++;
         num_allocated_bytes+=(int)size;
         num_meta_data_bytes+=sizeof(list_node);
-     //   print_node(new_node);
+        //   print_node(new_node);
 
         return new_node->memory_pointer;
 
@@ -242,33 +256,18 @@ void* malloc(size_t size) {
                 new_node->is_free = false;
 
                 return new_node->memory_pointer;
-           }
+            }
             new_node->is_free=false;
             new_node->used_size=size;
             num_free_blocks--;
             num_free_bytes-=(new_node->allocated_size);
 
 
-//            int remain_size= (int)(new_node->allocated_size) - (int)(size + sizeof(list_node) );
-//            if ( remain_size >= 128 ){         // reallocation of this block is waistful -> split the block
-//                void* new_addr=(void*)((long)(new_node->memory_pointer)+(long)(size));
-//                list_node* split_node=(list_node*)(new_addr);
-//                init_node(split_node ,true ,remain_size,0,new_node->next,new_node,NULL ) ;
-//                split_node->memory_pointer=&(split_node->memory_pointer)+1;
-//                new_node->next=split_node;
-//                new_node->allocated_size=size;
-//
-//                num_free_blocks++;
-//                num_allocated_blocks++;
-//                num_allocated_bytes-=(int)sizeof(list_node);
-//                num_meta_data_bytes+=(int)sizeof(list_node);
-//                num_free_bytes+=(int)(split_node->allocated_size);
-//            }
             split_block(new_node,size);
-            }
-            return new_node->memory_pointer;
-
         }
+        return new_node->memory_pointer;
+
+    }
 
 }
 
@@ -377,8 +376,4 @@ void* realloc (void* oldp, size_t size) {
 
 
 
-
-//
-// Created by omert on 6/11/2019.
-//
 

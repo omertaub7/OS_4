@@ -3,7 +3,7 @@
 /** Run the test 4 times, and each time change the _TEST_NUMBER definition.
  * _TEST_NUMBER should be: 1 or 2 or 3 or 4.
  */
-#define _TEST_NUMBER 4
+#define _TEST_NUMBER 1
 
 
 #if (1 == _TEST_NUMBER)
@@ -295,8 +295,7 @@ void malloc3_test_03() {
 }
 
 int main() {
-    printf("Hi there!\n");
-    //printf("%l",(long)sizeof(allocated_meta_data));
+  //  printf("Hi there!\n");
 
     assert(_num_free_blocks() == 0);
     assert(_num_free_bytes() == 0);
