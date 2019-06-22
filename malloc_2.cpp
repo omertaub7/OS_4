@@ -77,6 +77,11 @@ size_t _size_meta_data() {
     return sizeof(list_node);
 }
 
+void free(void*);
+void* malloc(size_t);
+void* realloc(void*, size_t);
+void* calloc (size_t , size_t );
+
 
 
 void* do_alloc (size_t size) {
@@ -181,12 +186,12 @@ void free (void* p) {
 if(p == NULL || p<=(void*)0 ) return ;
 
     list_node* node=(list_node*)((void*)((long)p-(long)sizeof(list_node)));
-    
-        
+
+
     if(!node){
     return;
     }
-    
+
     node->is_free = true;
     node->used_size = 0;
     num_free_blocks ++;
