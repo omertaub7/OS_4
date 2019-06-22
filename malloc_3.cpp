@@ -1,15 +1,13 @@
+
 #include <unistd.h>
-//#include <stdlib.h>
-#include <stdio.h>
 #include <cstring>
 
 
 using namespace std;
 
-
+/** ........................................list struct .................................................**/
 struct list_node {
     bool is_free;
-    // size_t meta_size;
     size_t allocated_size;
     size_t used_size;
     list_node* next;
@@ -26,7 +24,6 @@ void init_node(list_node* node ,bool is_free,size_t allocated_size,size_t used_s
     node->next=next;
     node->prev=prev;
     node->memory_pointer=memory_pointer;
-
 
 }
 
@@ -47,15 +44,10 @@ list_node* find_next_place (list_node* head, size_t to_alloc) {
     return NULL;
 }
 
-
-void print_node(list_node* node){
-
-    if(node==NULL)return;
-    printf(".......................................................\n.........................node addr : %p   \n node->is_free= %d  .......... addr : %p   \n node->allocated size= %d .... addr : %p   \n node->used size= %d  ........ addr : %p   \n node->memory pointer= %p .... addr : %p   \n ---total node size : %d \n .........................................................\n " , node  ,(int)(node->is_free),&(node->is_free),  (int)(node->allocated_size),&(node->allocated_size), (int)(node->used_size),&(node->used_size),   node->memory_pointer,&(node->memory_pointer),  (int)sizeof(list_node) );
-
-}
+/** .....................................................................................................**/
 
 
+/**..............................................Globals...................................................**/
 list_node* list_head = NULL;
 list_node* list_tail = NULL;
 int num_free_blocks = 0;
@@ -64,13 +56,16 @@ int num_allocated_blocks = 0;
 int num_allocated_bytes = 0;
 int num_meta_data_bytes = 0;
 
-void print_list (list_node* head) {
-    list_node* curr = head;
-    while (curr) {
-        print_node(curr);
-        curr=curr->next;
-    }
-}
+/** ............................................................................................... **/
+
+/** ......................................... functions ........................................... **/
+void free(void*);
+void* malloc(size_t);
+void* realloc(void*, size_t);
+void* calloc (size_t , size_t );
+
+list_node* split_block(list_node* , size_t );
+void merge_adjacent (list_node* ) ;
 
 
 size_t _num_free_blocks() {
@@ -98,20 +93,14 @@ size_t _size_meta_data() {
 }
 
 
-void print_mem(){
-    printf("\n ----------------------MEM--------------------------------------\n");
-    printf( "-alloc'd blocks  : %d \n",(int)_num_allocated_blocks());
-    printf( "-alloc'd bytes   : %d \n",(int)_num_allocated_bytes());
-    printf( "-free blocks     : %d \n",(int)_num_free_blocks());
-    printf( "-free bytes      : %d \n",(int)_num_free_bytes());
-    printf( "-metaData bytes  : %d \n",(int)_num_meta_data_bytes());
-    printf( "-metaData size   : %d \n",(int)_size_meta_data());
-    printf("\n ----------------------------------------------------------------\n");
 
-}
+/**-----------------------------------------------Helpers-------------------------------------------------**/
 
-
-
+/**
+ * do actual allocation of space with brk()
+ * @param size to alloc
+ * @return new block addr.
+ */
 void* do_alloc (size_t size) {
     if (size == 0 || size >= 100000000) return NULL;
 
@@ -139,22 +128,27 @@ list_node* split_block(list_node* node, size_t size){
     if ( remain_size >= 128 ) {         // reallocation of this block is waistful -> split the block
         void *new_addr = (void *) ((long) (node->memory_pointer) + (long) (size));
         list_node *split_node = (list_node *) (new_addr);
-        init_node(split_node, true, remain_size, 0, node->next, node, NULL);
+        init_node(split_node, false, remain_size, 0, node->next, node, NULL);
         split_node->memory_pointer = &(split_node->memory_pointer) + 1;
         node->next = split_node;
+        free(split_node->memory_pointer);
+
         node->allocated_size = size;
 
-        num_free_blocks++;
         num_allocated_blocks++;
         num_allocated_bytes -= (int) sizeof(list_node);
         num_meta_data_bytes += (int) sizeof(list_node);
-        num_free_bytes += (int) (split_node->allocated_size);
+     //   num_free_bytes += (int) (split_node->allocated_size);
         return  split_node;
 
     }
     return NULL;
 }
 
+/**
+ * check if two / three free adjacent blocks should be merged into one and do it
+ * @param node
+ */
 void merge_adjacent (list_node* node) {
 
     if(node->next && node->next->is_free){
@@ -181,7 +175,7 @@ void merge_adjacent (list_node* node) {
     }
 
 }
-
+/**------------------------------------------------------------------------------------------------------------**/
 
 void* malloc(size_t size) {
 
@@ -249,21 +243,7 @@ void* malloc(size_t size) {
             num_free_bytes-=(new_node->allocated_size);
 
 
-//            int remain_size= (int)(new_node->allocated_size) - (int)(size + sizeof(list_node) );
-//            if ( remain_size >= 128 ){         // reallocation of this block is waistful -> split the block
-//                void* new_addr=(void*)((long)(new_node->memory_pointer)+(long)(size));
-//                list_node* split_node=(list_node*)(new_addr);
-//                init_node(split_node ,true ,remain_size,0,new_node->next,new_node,NULL ) ;
-//                split_node->memory_pointer=&(split_node->memory_pointer)+1;
-//                new_node->next=split_node;
-//                new_node->allocated_size=size;
-//
-//                num_free_blocks++;
-//                num_allocated_blocks++;
-//                num_allocated_bytes-=(int)sizeof(list_node);
-//                num_meta_data_bytes+=(int)sizeof(list_node);
-//                num_free_bytes+=(int)(split_node->allocated_size);
-//            }
+
             split_block(new_node,size);
             }
             return new_node->memory_pointer;
@@ -307,21 +287,22 @@ void* realloc (void* oldp, size_t size) {
     list_node* node=(list_node*)((long)oldp-(long)sizeof(list_node));
     if (node->allocated_size >= size) {
         node->used_size = size;
-        //TODO: splitting if remain size>=128
+        split_block(node,size);
         return oldp;
     } else {// not enough space
         size_t next_free = (node->next&&node->next->is_free)?(node->next->allocated_size + sizeof(list_node)):0;
         size_t prev_free = (node->prev&&node->prev->is_free)?(node->prev->allocated_size + sizeof(list_node)):0;
         if(next_free && next_free+node->allocated_size >= size){ //current+next is enough
             if (node->next->next) node->next->next->prev = node;
-            node->next = node->next->next;
-            node->allocated_size +=next_free;
-            node->used_size=size;
             num_allocated_bytes+=sizeof(list_node);
             num_allocated_blocks--;
             num_free_blocks--;
             num_free_bytes-=node->next->allocated_size;
             num_meta_data_bytes-=sizeof(list_node);
+            node->next = node->next->next;
+            node->allocated_size +=next_free;
+            node->used_size=size;
+
 
             split_block(node,size);
 
@@ -330,6 +311,7 @@ void* realloc (void* oldp, size_t size) {
         if(prev_free && prev_free+node->allocated_size >= size){ //current+prev is enough
             node->prev->next = node->next;
             if (node->next) node->next->prev = node->prev;
+            num_free_bytes-=node->prev->allocated_size;
             node->prev->allocated_size+=sizeof(list_node)+node->allocated_size;
             node->prev->used_size=size;
             node->prev->is_free=false;
@@ -337,7 +319,7 @@ void* realloc (void* oldp, size_t size) {
             num_allocated_bytes+=sizeof(list_node);
             num_allocated_blocks--;
             num_free_blocks--;
-            num_free_bytes-=node->prev->allocated_size;
+
             num_meta_data_bytes-=sizeof(list_node);
 
             split_block(node->prev,size);
@@ -346,6 +328,11 @@ void* realloc (void* oldp, size_t size) {
         }
         if(prev_free && next_free && prev_free+next_free+node->allocated_size >= size){ // current+prev+next is enough
             list_node* merged_node = node->prev;
+
+            num_free_bytes-=node->prev->allocated_size;
+
+            num_free_bytes-=node->next->allocated_size;
+
             merged_node->next = node->next->next;
             if (node->next->next) node->next->next->prev = merged_node;
             merged_node->allocated_size+=(sizeof(list_node)+node->allocated_size+next_free);
@@ -357,8 +344,7 @@ void* realloc (void* oldp, size_t size) {
             num_allocated_bytes+=(2*sizeof(list_node));
             num_allocated_blocks-=2;
             num_free_blocks-=2;
-            num_free_bytes-=node->prev->allocated_size;
-            num_free_bytes-=node->next->allocated_size;
+
             num_meta_data_bytes-=2*sizeof(list_node);
 
 
@@ -370,15 +356,8 @@ void* realloc (void* oldp, size_t size) {
         void* new_block = malloc(size);
         if (!new_block) return NULL;
         std::memcpy(new_block, oldp , size_to_copy);
-        //if(new_block!= oldp)
         return new_block;
     }
 }
 
-
-
-
-//
-// Created by omert on 6/11/2019.
-//
 

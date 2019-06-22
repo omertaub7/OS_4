@@ -1,6 +1,4 @@
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <cstring>
 
 
@@ -9,7 +7,6 @@ using namespace std;
 
 struct list_node {
     bool is_free;
-    // size_t meta_size;
     size_t allocated_size;
     size_t used_size;
     list_node* next;
@@ -36,11 +33,9 @@ void init_node(list_node* node ,bool is_free,size_t allocated_size,size_t used_s
 //if returned null : need to alloc at the end of the list
 list_node* find_next_place (list_node* head, size_t to_alloc) {
 
-    // printf("\n looking for node with place of  %d or more \n",(int)to_alloc);
     if(head == NULL ) return NULL;
     list_node *curr=head;
     while(curr!= NULL){
-        // printf("current node is free?  %d and it has a place of %d \n",(int)(curr->is_free),(int )curr->allocated_size );
         if(curr->is_free && (curr->allocated_size >= to_alloc || !curr->next)){
             return curr;
         }
@@ -50,14 +45,6 @@ list_node* find_next_place (list_node* head, size_t to_alloc) {
 }
 
 
-
-//void print_list (list_node* head) {
-//    list_node* curr = head;
-//    while (curr) {
-//        print_node(curr);
-//        curr=curr->next;
-//    }
-//}
 list_node* list_head = NULL;
 list_node* list_tail = NULL;
 int num_free_blocks = 0;
@@ -88,14 +75,6 @@ size_t _num_meta_data_bytes() { //all meta data bytes in heap
 
 size_t _size_meta_data() {
     return sizeof(list_node);
-}
-
-
-void print_node(list_node* node){
-
-if(node==NULL)return;
-printf(".......................................................\n.........................node addr : %p   \n node->is_free= %d  .......... addr : %p   \n node->allocated size= %d .... addr : %p   \n node->used size= %d  ........ addr : %p   \n node->memory pointer= %p .... addr : %p   \n ---total node size : %d \n .........................................................\n " , node  ,(int)(node->is_free),&(node->is_free),  (int)(node->allocated_size),&(node->allocated_size), (int)(node->used_size),&(node->used_size),   node->memory_pointer,&(node->memory_pointer),  (int)sizeof(list_node) );
-
 }
 
 
@@ -163,11 +142,8 @@ void* malloc(size_t size) {
          num_free_bytes-=(new_node->allocated_size);
          return new_node->memory_pointer;
             
-     }
-         // should not get here:
-       
-         return NULL;
-   
+            }
+
       }
          
 }
@@ -203,36 +179,18 @@ void* realloc (void* oldp, size_t size) {
 
 void free (void* p) {
 if(p == NULL || p<=(void*)0 ) return ;
-   /*
-    list_node* node=list_head;
-    while(node!=NULL && ((void*)(node+1))!=p){
-    
-      node=node->next;
-    
-    }
-    */
- //   printf("addr to free: %p\n",p);
-    
+
     list_node* node=(list_node*)((void*)((long)p-(long)sizeof(list_node)));
     
         
     if(!node){
-  //  printf("what?! didnt find block to free?!?!?\n");
     return;
     }
     
-   // list_node* node =(list_node*) (p-sizeof(list_node));
     node->is_free = true;
     node->used_size = 0;
     num_free_blocks ++;
     num_free_bytes += node->allocated_size;
-  //  print_node(node);
 }
 
-
-
-
-//
-// Created by omert on 6/11/2019.
-//
 
