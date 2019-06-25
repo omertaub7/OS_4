@@ -1,6 +1,8 @@
 
 #include <unistd.h>
 #include <cstring>
+//#include <stdlib.h>
+//#include <iostream>
 
 
 using namespace std;
@@ -59,10 +61,10 @@ int num_meta_data_bytes = 0;
 /** ............................................................................................... **/
 
 /** ......................................... functions ........................................... **/
-void free(void*);
-void* malloc(size_t);
-void* realloc(void*, size_t);
-void* calloc (size_t , size_t );
+void free(void* p);
+void* malloc(size_t size);
+void* realloc(void* oldp, size_t size);
+void* calloc (size_t num, size_t size);
 
 list_node* split_block(list_node* , size_t );
 void merge_adjacent (list_node* ) ;
@@ -124,13 +126,18 @@ void* do_alloc (size_t size) {
  */
 list_node* split_block(list_node* node, size_t size){
     if(node==NULL) return NULL;
+
     int remain_size= (int)(node->allocated_size) - (int)(size + sizeof(list_node) );
     if ( remain_size >= 128 ) {         // reallocation of this block is waistful -> split the block
         void *new_addr = (void *) ((long) (node->memory_pointer) + (long) (size));
         list_node *split_node = (list_node *) (new_addr);
         init_node(split_node, false, remain_size, 0, node->next, node, NULL);
         split_node->memory_pointer = &(split_node->memory_pointer) + 1;
+        if(node->next ){
+            node->next->prev =split_node;
+        }
         node->next = split_node;
+
         free(split_node->memory_pointer);
 
         node->allocated_size = size;
@@ -278,8 +285,11 @@ void* calloc (size_t num, size_t size) {
 }
 
 
-void* realloc (void* oldp, size_t size) {
+void* realloc(void* oldp, size_t size) {
     if ( size <=0 || size >= 100000000) return NULL;
+    if (size%4) {
+        size+=(4-(size%4));
+    }
     if(oldp == NULL){
         return malloc(size);
     }
